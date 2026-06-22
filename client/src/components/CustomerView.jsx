@@ -93,7 +93,7 @@ export default function CustomerView({ menu }) {
         <div>
             <h2>Customer Menu</h2>
             <div data-testid="menu-list">
-                <h3>Select Pizza</h3>
+                <h3 className="section-title">Select Pizza</h3>
                 {menu.pizzas.map(p => (
                     <label key={p.id} style={{ display: 'block' }}>
                         <input type="radio" name="pizza" checked={selectedPizza.id === p.id} onChange={() => setSelectedPizza(p)} />
@@ -101,7 +101,7 @@ export default function CustomerView({ menu }) {
                     </label>
                 ))}
                 
-                <h3>Select Size</h3>
+                <h3 className="section-title">Select Size</h3>
                 {menu.sizes.map(s => (
                     <label key={s.id} style={{ display: 'block' }}>
                         <input type="radio" name="size" checked={selectedSize.id === s.id} onChange={() => setSelectedSize(s)} />
@@ -109,7 +109,7 @@ export default function CustomerView({ menu }) {
                     </label>
                 ))}
 
-                <h3>Select Toppings (Max 2)</h3>
+                <h3 className="section-title">Select Toppings (Max 2)</h3>
                 {menu.toppings.map(t => (
                     <label key={t.id} style={{ display: 'block' }}>
                         <input type="checkbox" checked={selectedToppings.some(st => st.id === t.id)} onChange={() => handleToppingChange(t)} />
@@ -138,7 +138,7 @@ export default function CustomerView({ menu }) {
             <hr />
 
             <div data-testid="order-summary-panel">
-                <h3>Order Summary</h3>
+                <h3 className="section-title">Order Summary</h3>
                 <p>Estimated Total: {estimatedTotal} NIS</p>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '200px' }}>

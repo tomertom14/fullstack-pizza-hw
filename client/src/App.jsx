@@ -17,9 +17,9 @@ function App() {
     if (!menu) return <div>Loading Menu...</div>;
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-            <h1>Pizza Ordering System</h1>
-            <nav style={{ marginBottom: '20px', gap: '10px', display: 'flex' }}>
+        <div className="app-wrapper" style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+            <h1 className="app-title">Pizza Ordering System</h1>
+            <nav>
                 <button onClick={() => setCurrentView('customer')}>Customer</button>
                 <button onClick={() => setCurrentView('employee')}>Employee</button>
                 <button onClick={() => setCurrentView('delivery')}>Delivery</button>
