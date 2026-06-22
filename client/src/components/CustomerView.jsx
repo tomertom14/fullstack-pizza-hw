@@ -6,12 +6,12 @@ export default function CustomerView({ menu }) {
     const [selectedSize, setSelectedSize] = useState(menu.sizes[0]);
     const [selectedToppings, setSelectedToppings] = useState([]);
     const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', address: '' });
+    const [orderConfirmation, setOrderConfirmation] = useState(null);
 
     const handleToppingChange = (topping) => {
         if (selectedToppings.find(t => t.id === topping.id)) {
             setSelectedToppings(selectedToppings.filter(t => t.id !== topping.id));
         } else {
-            // Personal rule: max 2 toppings per pizza
             if (selectedToppings.length < 2) {
                 setSelectedToppings([...selectedToppings, topping]);
             } else {
@@ -33,11 +33,61 @@ export default function CustomerView({ menu }) {
         setSelectedToppings([]);
     };
 
+    const handleCheckout = async () => {
+        // Map cart items to the format expected by the server
+        const payload = {
+            customerName: customerInfo.name,
+            phone: customerInfo.phone,
+            deliveryAddress: customerInfo.address,
+            pizzas: cart.map(item => ({
+                pizzaId: item.pizza.id,
+                sizeId: item.size.id,
+                toppingIds: item.toppings.map(t => t.id)
+            }))
+        };
+
+        try {
+            const response = await fetch('http://localhost:3001/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setOrderConfirmation(data);
+                setCart([]); // Clear cart
+                setCustomerInfo({ name: '', phone: '', address: '' });
+            } else {
+                const errorData = await response.json();
+                alert(`Error: ${errorData.error}`);
+            }
+        } catch (err) {
+            console.error("Failed to submit order", err);
+            alert("Failed to connect to the server.");
+        }
+    };
+
     const estimatedTotal = cart.reduce((total, item) => {
         let itemPrice = item.pizza.price + item.size.price;
         item.toppings.forEach(t => itemPrice += t.price);
         return total + itemPrice;
     }, 0);
+
+    // Render Confirmation Screen if order was placed successfully
+    if (orderConfirmation) {
+        return (
+            <div data-testid="order-confirmation">
+                <h2>Order Confirmed!</h2>
+                <p>Order ID: <strong>{orderConfirmation.id}</strong></p>
+                <p>Status: {orderConfirmation.status}</p>
+                <p>Final Price: {orderConfirmation.totalPrice} NIS (Calculated by Server)</p>
+                <button onClick={() => setOrderConfirmation(null)} style={{ marginTop: '10px' }}>
+                    Start New Order
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -97,7 +147,7 @@ export default function CustomerView({ menu }) {
                     <input type="text" placeholder="Address" value={customerInfo.address} onChange={e => setCustomerInfo({...customerInfo, address: e.target.value})} />
                 </div>
                 
-                <button data-testid="checkout-button" style={{ marginTop: '10px' }} 
+                <button data-testid="checkout-button" onClick={handleCheckout} style={{ marginTop: '10px' }} 
                         disabled={cart.length === 0 || !customerInfo.name || !customerInfo.phone || !customerInfo.address}>
                     Checkout
                 </button>

@@ -37,3 +37,84 @@ app.get("/api/menu", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+// In-memory storage for orders
+const orders = [];
+let orderIdCounter = 1;
+
+// POST /api/orders
+app.post("/api/orders", (req, res) => {
+  // Expected fields from client [cite: 53, 54]
+  const { customerName, phone, deliveryAddress, pizzas } = req.body;
+
+  // Basic Validation
+  if (
+    !customerName ||
+    !phone ||
+    !deliveryAddress ||
+    !pizzas ||
+    !Array.isArray(pizzas) ||
+    pizzas.length === 0
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Missing required fields or empty pizza list" });
+  }
+
+  let totalPrice = 0;
+  const processedPizzas = [];
+
+  // Process and validate pizzas
+  for (const item of pizzas) {
+    const menuPizza = menu.pizzas.find((p) => p.id === item.pizzaId);
+    const menuSize = menu.sizes.find((s) => s.id === item.sizeId);
+
+    if (!menuPizza || !menuSize) {
+      return res.status(400).json({ error: "Invalid pizza or size selected" });
+    }
+
+    // Personal rule validation: max 2 toppings
+    if (item.toppingIds && item.toppingIds.length > 2) {
+      return res
+        .status(400)
+        .json({ error: "Maximum 2 toppings allowed per pizza" });
+    }
+
+    let pizzaCost = menuPizza.price + menuSize.price;
+    const processedToppings = [];
+
+    if (item.toppingIds) {
+      for (const tId of item.toppingIds) {
+        const menuTopping = menu.toppings.find((t) => t.id === tId);
+        if (!menuTopping) {
+          return res.status(400).json({ error: `Invalid topping: ${tId}` });
+        }
+        pizzaCost += menuTopping.price;
+        processedToppings.push(menuTopping);
+      }
+    }
+
+    totalPrice += pizzaCost; // Calculate total purely on the server
+    processedPizzas.push({
+      pizza: menuPizza,
+      size: menuSize,
+      toppings: processedToppings,
+      price: pizzaCost,
+    });
+  }
+
+  // Create the order
+  const newOrder = {
+    id: `ORD-${orderIdCounter++}`,
+    customerName,
+    phone,
+    deliveryAddress,
+    pizzas: processedPizzas,
+    totalPrice,
+    status: "new",
+    createdAt: new Date().toISOString(),
+  };
+
+  orders.push(newOrder);
+  res.status(201).json(newOrder); // Return 201 Created [cite: 78]
+});
