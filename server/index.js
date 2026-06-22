@@ -118,3 +118,51 @@ app.post("/api/orders", (req, res) => {
   orders.push(newOrder);
   res.status(201).json(newOrder); // Return 201 Created [cite: 78]
 });
+
+// GET /api/orders (with optional status query)
+app.get("/api/orders", (req, res) => {
+  const status = req.query.status;
+  if (status) {
+    // If status is provided, filter the orders.
+    // We split by comma to allow querying multiple statuses at once (e.g., ?status=new,preparing)
+    const statuses = status.split(",");
+    const filtered = orders.filter((o) => statuses.includes(o.status));
+    return res.status(200).json(filtered);
+  }
+  // If no status is provided, return all orders
+  res.status(200).json(orders);
+});
+
+// GET /api/orders/:id
+app.get("/api/orders/:id", (req, res) => {
+  const order = orders.find((o) => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  res.status(200).json(order);
+});
+
+// PATCH /api/orders/:id/status
+app.patch("/api/orders/:id/status", (req, res) => {
+  const order = orders.find((o) => o.id === req.params.id);
+  if (!order) return res.status(404).json({ error: "Order not found" });
+
+  const newStatus = req.body.status;
+
+  // Define valid state machine transitions
+  const validTransitions = {
+    new: "preparing",
+    preparing: "ready",
+    ready: "delivered",
+    delivered: null, // Cannot transition out of delivered
+  };
+
+  if (validTransitions[order.status] !== newStatus) {
+    return res
+      .status(409)
+      .json({
+        error: `Invalid status transition from ${order.status} to ${newStatus}`,
+      });
+  }
+
+  order.status = newStatus;
+  res.status(200).json(order);
+});

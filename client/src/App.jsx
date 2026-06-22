@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import CustomerView from './components/CustomerView';
+import EmployeeView from './components/EmployeeView';
+import DeliveryView from './components/DeliveryView';
 
 function App() {
     const [currentView, setCurrentView] = useState('customer'); 
@@ -25,8 +27,8 @@ function App() {
             
             <main>
                 {currentView === 'customer' && <CustomerView menu={menu} />}
-                {currentView === 'employee' && <div>Employee View (Coming Soon)</div>}
-                {currentView === 'delivery' && <div>Delivery View (Coming Soon)</div>}
+                {currentView === 'employee' && <EmployeeView />}
+                {currentView === 'delivery' && <DeliveryView />}
             </main>
         </div>
     );
