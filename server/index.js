@@ -112,6 +112,7 @@ app.post("/api/orders", (req, res) => {
     pizzas: processedPizzas,
     totalPrice,
     status: "new",
+    paymentStatus: "paid", // Added payment status
     createdAt: new Date().toISOString(),
   };
 
@@ -156,11 +157,9 @@ app.patch("/api/orders/:id/status", (req, res) => {
   };
 
   if (validTransitions[order.status] !== newStatus) {
-    return res
-      .status(409)
-      .json({
-        error: `Invalid status transition from ${order.status} to ${newStatus}`,
-      });
+    return res.status(409).json({
+      error: `Invalid status transition from ${order.status} to ${newStatus}`,
+    });
   }
 
   order.status = newStatus;
