@@ -48,7 +48,10 @@ export default function EmployeeView() {
                         <li key={o.id} style={{ border: '1px solid #ccc', margin: '10px 0', padding: '15px' }}>
                             <p><strong>Order ID:</strong> {o.id}</p>
                             <p><strong>Customer:</strong> {o.customerName}</p>
-                            <p><strong>Items:</strong> {o.pizzas.map(p => `${p.pizza.name} (${p.size.name})`).join(', ')}</p>
+                            <p><strong>Items:</strong> {o.pizzas.map(p => {
+                                const toppings = p.toppings.length > 0 ? ` + ${p.toppings.map(t => t.name).join(', ')}` : '';
+                                return `${p.pizza.name} (${p.size.name})${toppings}`;
+                            }).join(' | ')}</p>
                             <p><strong>Total:</strong> {o.totalPrice} NIS</p>
                             <p><strong>Status:</strong> {o.status}</p>
                             

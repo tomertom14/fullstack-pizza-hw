@@ -34,10 +34,6 @@ app.get("/api/menu", (req, res) => {
   res.status(200).json(menu);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
 // In-memory storage for orders
 const orders = [];
 let orderIdCounter = 1;
@@ -164,4 +160,8 @@ app.patch("/api/orders/:id/status", (req, res) => {
 
   order.status = newStatus;
   res.status(200).json(order);
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
