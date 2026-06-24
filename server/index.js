@@ -2,13 +2,13 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-// The server must use the PORT environment variable or default to 3001
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
 
-// Mandatory menu items
+// ─── Menu ────────────────────────────────────────────────────────────────────
+
 const menu = {
   pizzas: [
     { id: "p1", name: "Margherita", price: 35 },
@@ -29,68 +29,109 @@ const menu = {
   ],
 };
 
-// GET /api/menu route
+// ─── In-memory storage ───────────────────────────────────────────────────────
+
+const orders = [];
+let orderIdCounter = 1;
+
+// ─── Valid order statuses and their allowed next state ───────────────────────
+
+const VALID_TRANSITIONS = {
+  new: "preparing",
+  preparing: "ready",
+  ready: "delivered",
+  delivered: null,
+};
+
+// ─── Routes ──────────────────────────────────────────────────────────────────
+
+// GET /api/menu
 app.get("/api/menu", (req, res) => {
   res.status(200).json(menu);
 });
 
-// In-memory storage for orders
-const orders = [];
-let orderIdCounter = 1;
-
 // POST /api/orders
 app.post("/api/orders", (req, res) => {
-  // Expected fields from client [cite: 53, 54]
   const { customerName, phone, deliveryAddress, pizzas } = req.body;
 
-  // Basic Validation
+  // Validate required top-level fields
   if (
     !customerName ||
-    !phone ||
+    typeof customerName !== "string" ||
+    customerName.trim() === ""
+  ) {
+    return res.status(400).json({ error: "Missing or invalid customerName" });
+  }
+  if (!phone || typeof phone !== "string" || phone.trim() === "") {
+    return res.status(400).json({ error: "Missing or invalid phone" });
+  }
+  if (
     !deliveryAddress ||
-    !pizzas ||
-    !Array.isArray(pizzas) ||
-    pizzas.length === 0
+    typeof deliveryAddress !== "string" ||
+    deliveryAddress.trim() === ""
   ) {
     return res
       .status(400)
-      .json({ error: "Missing required fields or empty pizza list" });
+      .json({ error: "Missing or invalid deliveryAddress" });
+  }
+  if (!pizzas || !Array.isArray(pizzas) || pizzas.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "Order must include at least one pizza" });
   }
 
   let totalPrice = 0;
   const processedPizzas = [];
 
-  // Process and validate pizzas
   for (const item of pizzas) {
+    // Validate pizza exists in menu
     const menuPizza = menu.pizzas.find((p) => p.id === item.pizzaId);
-    const menuSize = menu.sizes.find((s) => s.id === item.sizeId);
-
-    if (!menuPizza || !menuSize) {
-      return res.status(400).json({ error: "Invalid pizza or size selected" });
+    if (!menuPizza) {
+      return res
+        .status(400)
+        .json({ error: `Invalid pizza id: ${item.pizzaId}` });
     }
 
-    // Personal rule validation: max 2 toppings
-    if (item.toppingIds && item.toppingIds.length > 2) {
+    // Validate size exists in menu
+    const menuSize = menu.sizes.find((s) => s.id === item.sizeId);
+    if (!menuSize) {
+      return res.status(400).json({ error: `Invalid size id: ${item.sizeId}` });
+    }
+
+    const toppingIds = item.toppingIds ?? [];
+
+    // FIX 1: Validate each topping id against the menu BEFORE checking the count,
+    // so an invalid id always returns 400 and not a misleading message.
+    const processedToppings = [];
+    for (const tId of toppingIds) {
+      const menuTopping = menu.toppings.find((t) => t.id === tId);
+      if (!menuTopping) {
+        return res.status(400).json({ error: `Invalid topping id: ${tId}` });
+      }
+      processedToppings.push(menuTopping);
+    }
+
+    // FIX 2: Reject duplicate toppings on the same pizza (would cause double billing).
+    const uniqueToppingIds = new Set(toppingIds);
+    if (uniqueToppingIds.size !== toppingIds.length) {
+      return res.status(400).json({
+        error: "Duplicate toppings are not allowed on the same pizza",
+      });
+    }
+
+    // Personal rule (ID ending in 0): max 2 toppings per pizza.
+    if (toppingIds.length > 2) {
       return res
         .status(400)
         .json({ error: "Maximum 2 toppings allowed per pizza" });
     }
 
-    let pizzaCost = menuPizza.price + menuSize.price;
-    const processedToppings = [];
+    const pizzaCost =
+      menuPizza.price +
+      menuSize.price +
+      processedToppings.reduce((sum, t) => sum + t.price, 0);
 
-    if (item.toppingIds) {
-      for (const tId of item.toppingIds) {
-        const menuTopping = menu.toppings.find((t) => t.id === tId);
-        if (!menuTopping) {
-          return res.status(400).json({ error: `Invalid topping: ${tId}` });
-        }
-        pizzaCost += menuTopping.price;
-        processedToppings.push(menuTopping);
-      }
-    }
-
-    totalPrice += pizzaCost; // Calculate total purely on the server
+    totalPrice += pizzaCost;
     processedPizzas.push({
       pizza: menuPizza,
       size: menuSize,
@@ -99,34 +140,31 @@ app.post("/api/orders", (req, res) => {
     });
   }
 
-  // Create the order
   const newOrder = {
     id: `ORD-${orderIdCounter++}`,
-    customerName,
-    phone,
-    deliveryAddress,
+    customerName: customerName.trim(),
+    phone: phone.trim(),
+    deliveryAddress: deliveryAddress.trim(),
     pizzas: processedPizzas,
     totalPrice,
     status: "new",
-    paymentStatus: "paid", // Added payment status
+    paymentStatus: "paid",
     createdAt: new Date().toISOString(),
   };
 
   orders.push(newOrder);
-  res.status(201).json(newOrder); // Return 201 Created [cite: 78]
+  res.status(201).json(newOrder);
 });
 
-// GET /api/orders (with optional status query)
+// GET /api/orders  (optional ?status=new,preparing)
 app.get("/api/orders", (req, res) => {
-  const status = req.query.status;
+  const { status } = req.query;
   if (status) {
-    // If status is provided, filter the orders.
-    // We split by comma to allow querying multiple statuses at once (e.g., ?status=new,preparing)
     const statuses = status.split(",");
-    const filtered = orders.filter((o) => statuses.includes(o.status));
-    return res.status(200).json(filtered);
+    return res
+      .status(200)
+      .json(orders.filter((o) => statuses.includes(o.status)));
   }
-  // If no status is provided, return all orders
   res.status(200).json(orders);
 });
 
@@ -142,25 +180,25 @@ app.patch("/api/orders/:id/status", (req, res) => {
   const order = orders.find((o) => o.id === req.params.id);
   if (!order) return res.status(404).json({ error: "Order not found" });
 
-  const newStatus = req.body.status;
+  const { status: newStatus } = req.body;
 
-  // Define valid state machine transitions
-  const validTransitions = {
-    new: "preparing",
-    preparing: "ready",
-    ready: "delivered",
-    delivered: null, // Cannot transition out of delivered
-  };
+  if (!newStatus || typeof newStatus !== "string") {
+    return res
+      .status(400)
+      .json({ error: "Request body must include a 'status' field" });
+  }
 
-  if (validTransitions[order.status] !== newStatus) {
+  if (VALID_TRANSITIONS[order.status] !== newStatus) {
     return res.status(409).json({
-      error: `Invalid status transition from ${order.status} to ${newStatus}`,
+      error: `Invalid status transition from '${order.status}' to '${newStatus}'`,
     });
   }
 
   order.status = newStatus;
   res.status(200).json(order);
 });
+
+// ─── Start ───────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
